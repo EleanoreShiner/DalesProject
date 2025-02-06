@@ -5,4 +5,3 @@ engine = create_engine('sqlite:///activities.sqlite', echo=True)
 
 Base.metadata.drop_all(engine)
 Base.metadata.create_all(engine)
-
