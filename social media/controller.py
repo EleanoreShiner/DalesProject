@@ -34,6 +34,20 @@ class Controller:
                            'number_likes' : len(Post.liked_by_users)} for Post in user.posts]
         return posts_info
 
+    def create_posts(self, title:str, content:str):
+        with so.Session(bind=self.engine) as session:
+            user = session.merge(self.current_user)
+            post = Post(title=title, description=content, user_id=user.id, user=user)
+            session.add(post)
+            session.commit()
+
+    def like_post(self, post:Post):
+        with so.Session(bind=self.engine) as session:
+            user = session.merge(self.current_user)
+            user.liked_posts.append(post)
+            post.liked_by_users.append(user)
+            session.commit()
+
 class CLI:
     def __init__(self):
         self.controller = Controller()
@@ -41,18 +55,20 @@ class CLI:
 
     @staticmethod
     def show_title(title):
-        print('/n'+ title)
-        print('-'*len(title)+'/n')
+        print('\n' + title)
+        print('-' * len(title) + '\n')
 
     def login(self):
-        self.show_title('Login')
+        self.show_title('Login Screen')
         users = self.controller.get_user_names()
-        menu_items = users + ['Create a new account','Exit',]
+        menu_items = users + ['Create a new account',
+                              'Exit',
+                              ]
         menu_choice = pyip.inputMenu(menu_items,
-                                     prompt = 'Select user or create a new account/n',
+                                     prompt='Select user or create a new account\n',
                                      numbered=True,
                                      )
-        if menu_choice.lower == 'create a new account':
+        if menu_choice.lower() == 'create a new account':
             self.create_account()
         elif menu_choice.lower() == 'exit':
             print('Goodbye')
@@ -61,8 +77,8 @@ class CLI:
             self.controller.set_current_user_from_name(user_name)
             self.user_home()
 
-    def create_account(self, existing_users = None):
-        self.show_title('Create Account ')
+    def create_account(self, existing_users=None):
+        self.show_title('Create Account Screen')
         print('Enter Account Details')
         user_name = pyip.inputStr('Username: ', blockRegexes=existing_users, strip=None)
         age = pyip.inputInt('Age: ', min=0, max=150, blank=True)
@@ -79,8 +95,46 @@ class CLI:
         self.show_posts(self.controller.current_user.name)
 
         menu_items = {'Show posts from another user': self.show_posts,
+                      'Create posts' : self.create_posts,
                       'Logout': self.login}
 
-        menu_choice = pyip.inputMenu(menu_items,)
+        menu_choice = pyip.inputMenu(list(menu_items.keys()),
+                                     prompt='Select an action\n',
+                                     numbered=True,
+                                     )
+        menu_items[menu_choice]()
+        if menu_choice != 'Logout':
+            self.user_home()
+
+    def show_posts(self, user_name: str | None = None):
+        if user_name is None:
+            users = self.controller.get_user_names()
+            menu_choice = pyip.inputMenu(users,
+                                         prompt='Select a user\n',
+                                         numbered=True,
+                                         )
+            user_name = menu_choice
+
+        self.show_title(f"{user_name}'s Posts")
+        posts = self.controller.get_posts(user_name)
+        for post in posts:
+            print(f'Title: {post["title"]}')
+            print(f'Content: {post["description"]}')
+            print(f'Likes: {post["number_likes"]}')
+
+        if not posts:
+            print('No Posts')
 
 
+    def create_posts(self):
+        print('Enter Post Details')
+        title = pyip.inputStr('Title: ')
+        content = pyip.inputStr('Content: ', blank=True)
+        self.controller.create_posts(title, content)
+        self.login()
+
+
+
+
+cli = CLI()
+controller = Controller()
