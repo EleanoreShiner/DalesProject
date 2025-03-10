@@ -32,3 +32,15 @@ class TestDatabase:
         assert rayhan.age == 20
         assert rayhan.gender == "male"
         assert rayhan.nationality is None
+
+    def test_invalid_user(self, db_session):
+        user = User(age=7, nationality='British')
+        db_session.add(user)
+        with pytest.raises(IntegrityError):
+            db_session.commit()
+        db_session.rollback()
+
+    def test_add_post(selfself, db_session):
+        user = User(name="Eleanore", age = 20, gender="female")
+        post = Post(title = 'hi', description = 'hello')
+        user.posts.append(post)
