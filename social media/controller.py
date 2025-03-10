@@ -26,12 +26,17 @@ class Controller:
             self.current_user = user
         return user
 
-    def get_posts(self, user_name:str) -> list[dict]:
+    def get_posts(self, user_name: str) -> list[dict]:
         with so.Session(bind=self.engine) as session:
             user = session.scalars(sa.select(User).where(User.name == user_name)).one_or_none()
-            posts_info = [{'title' : Post.description,
-                           'description' : Post.description,
-                           'number_likes' : len(Post.liked_by_users)} for Post in user.posts]
+            if not user:
+                return []
+            posts_info = [{
+                'title': post.title,
+                'id': post.id,
+                'description': post.description,
+                'number_likes': len(post.liked_by_users)
+            } for post in user.posts]
         return posts_info
 
     def create_posts(self, title:str, content:str):
@@ -41,12 +46,13 @@ class Controller:
             session.add(post)
             session.commit()
 
-    def like_post(self, post:Post):
+    def like_post(self, post_id):
         with so.Session(bind=self.engine) as session:
             user = session.merge(self.current_user)
-            user.liked_posts.append(post)
-            post.liked_by_users.append(user)
-            session.commit()
+            post = session.get(Post, post_id)  # Fetch post
+            if post and user not in post.liked_by_users:
+                post.liked_by_users.append(user)
+                session.commit()
 
 class CLI:
     def __init__(self):
@@ -106,6 +112,18 @@ class CLI:
         if menu_choice != 'Logout':
             self.user_home()
 
+    def post_menu(self, posts):
+        self.show_title('Post Actions')
+        post_map = {post["title"]: post for post in posts}
+        post_titles = list(post_map.keys()) + ['Exit']
+        like_menu = pyip.inputMenu(post_titles, prompt='Choose a post to like/unlike or exit\n', numbered=True)
+        if like_menu.lower() == 'exit':
+            return
+        else:
+            post = post_map[like_menu]
+            self.controller.like_post(post["id"])
+            self.post_menu(posts)
+
     def show_posts(self, user_name: str | None = None):
         if user_name is None:
             users = self.controller.get_user_names()
@@ -118,12 +136,15 @@ class CLI:
         self.show_title(f"{user_name}'s Posts")
         posts = self.controller.get_posts(user_name)
         for post in posts:
+            print(f'ID: {post["id"]}')
             print(f'Title: {post["title"]}')
             print(f'Content: {post["description"]}')
             print(f'Likes: {post["number_likes"]}')
 
         if not posts:
             print('No Posts')
+        else:
+            self.post_menu(posts)
 
 
     def create_posts(self):
