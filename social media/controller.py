@@ -46,12 +46,33 @@ class Controller:
             session.add(post)
             session.commit()
 
+    def get_comments(self, post_id: str) -> list[dict]:
+        with so.Session(bind=self.engine) as session:
+            post = session.scalars(sa.select(Post).where(Post.id == post_id)).one_or_none()
+            comments_info = [{'id': comment.id,
+                           'user_id': comment.user_id,
+                           'post_id': comment.post_id,
+                           'comment': comment.comment,
+                           }
+                           for comment in post.comments]
+        return comments_info
+
+    def create_comment(self, post_id, comment):
+        with so.Session(bind=self.engine) as session:
+            comment = Comment(user_id=self.current_user.id, post_id=post_id, comment=comment)
+            session.add(comment)
+            session.commit()
+        return comment
+
     def like_post(self, post_id):
         with so.Session(bind=self.engine) as session:
             user = session.merge(self.current_user)
             post = session.get(Post, post_id)  # Fetch post
             if post and user not in post.liked_by_users:
                 post.liked_by_users.append(user)
+                session.commit()
+            else:
+                post.liked_by_users.remove(user)
                 session.commit()
 
 class CLI:
@@ -154,7 +175,16 @@ class CLI:
         self.controller.create_posts(title, content)
         self.login()
 
+    def show_comments(self, post):
+        comments = self.controller.get_comments(post['id'])
+        for comment in comments:
+            print(f'Comment: {comment["comment"]}')
 
+    def create_comments(self):
+        post_id = self.controller.choose_post()
+        comment = input("Enter your comment: ").strip()
+
+        self.controller.create_comment(post_id, comment)
 
 
 cli = CLI()
