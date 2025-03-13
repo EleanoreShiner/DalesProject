@@ -186,6 +186,6 @@ class CLI:
 
         self.controller.create_comment(post_id, comment)
 
-
-cli = CLI()
-controller = Controller()
+if __name__ == "__main__":
+    cli = CLI()
+    controller = Controller()
